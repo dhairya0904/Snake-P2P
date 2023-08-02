@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/gdamore/tcell"
-	mapstructure "github.com/mitchellh/mapstructure"
+	"github.com/mitchellh/mapstructure"
 )
 
 type Game struct {
@@ -76,18 +76,28 @@ func (g *Game) Run() {
 	g.snakeBody.ResetPos(width, height)
 	g.opponentSnakeBody.ResetPos(width/2, height/2)
 	g.UpdateFoodPos(width, height)
-	g.UpdateOFoodPos(width, height)
 	g.GameOver = false
 	g.Score = 0
 	snakeStyle := tcell.StyleDefault.Background(tcell.ColorWhite).Foreground(tcell.ColorWhite)
+	oppSnakeStyle := tcell.StyleDefault.Background(tcell.ColorWhite).Foreground(tcell.ColorWhite)
+	go g.updatePeerSnake()
 	for {
 
 		longerSnake := false
+		oppFoodTaken := false
+
 		g.Screen.Clear()
-		if checkCollision(g.snakeBody.Parts[len(g.snakeBody.Parts)-1:], g.FoodPos) {
+		if checkCollision(g.snakeBody.Parts[len(g.snakeBody.Parts)-1:], g.FoodPos) ||
+			checkCollision(g.snakeBody.Parts[len(g.snakeBody.Parts)-1:], g.OpponentFoodPos) {
 			g.UpdateFoodPos(width, height)
 			longerSnake = true
 			g.Score++
+		}
+		if checkCollision(g.snakeBody.Parts[len(g.snakeBody.Parts)-1:], g.OpponentFoodPos) {
+			g.UpdateOFoodPos(width, height)
+			longerSnake = true
+			g.Score++
+			oppFoodTaken = true
 		}
 		if checkCollision(g.snakeBody.Parts[:len(g.snakeBody.Parts)-1], g.snakeBody.Parts[len(g.snakeBody.Parts)-1]) {
 			break
@@ -99,21 +109,17 @@ func (g *Game) Run() {
 			Parts:   g.snakeBody.Parts,
 			Xspeed:  g.snakeBody.Xspeed,
 			Yspeed:  g.snakeBody.Yspeed,
+			Width:   width,
+			Height:  height,
+		}
+		if oppFoodTaken {
+			newState.OpponenetFoodPos = g.OpponentFoodPos
 		}
 		g.Node.writeChannel <- newState
 
-		var newSnakeState GameStateUpdade
-		tmo := <-g.Node.readChannel
-		err := mapstructure.Decode(tmo, &newSnakeState)
-		if err != nil {
-			panic(err)
-		}
-
-		g.opponentSnakeBody.Parts = newSnakeState.Parts
-
 		g.opponentSnakeBody.Update(width, height, longerSnake)
 		drawParts(g.Screen, g.snakeBody.Parts, g.FoodPos, snakeStyle, defStyle)
-		drawParts(g.Screen, g.opponentSnakeBody.Parts, g.OpponentFoodPos, snakeStyle, defStyle)
+		drawParts(g.Screen, g.opponentSnakeBody.Parts, g.OpponentFoodPos, oppSnakeStyle, defStyle)
 		drawText(g.Screen, 1, 1, 8+len(strconv.Itoa(g.Score)), 1, "Score: "+strconv.Itoa(g.Score))
 		time.Sleep(40 * time.Millisecond)
 		g.Screen.Show()
@@ -121,4 +127,53 @@ func (g *Game) Run() {
 	g.GameOver = true
 	drawText(g.Screen, width/2-20, height/2, width/2+20, height/2, "Game Over, Score: "+strconv.Itoa(g.Score)+", Play Again? y/n")
 	g.Screen.Show()
+}
+
+func (g *Game) updatePeerSnake() {
+	for {
+		var newSnakeState GameStateUpdade
+		tmo := <-g.Node.readChannel
+		err := mapstructure.Decode(tmo, &newSnakeState)
+		if err != nil {
+			panic(err)
+		}
+
+		width, height := g.Screen.Size()
+		normalizeLocation(&newSnakeState, width, height)
+		g.opponentSnakeBody.Parts = newSnakeState.Parts
+		g.opponentSnakeBody.Xspeed = newSnakeState.Xspeed
+		g.opponentSnakeBody.Yspeed = newSnakeState.Yspeed
+		g.OpponentFoodPos = newSnakeState.FoodPos
+
+		if newSnakeState.OpponenetFoodPos == (Part{}) && newSnakeState.OpponenetFoodPos.X != 0 {
+			g.FoodPos = newSnakeState.OpponenetFoodPos
+		}
+	}
+}
+
+func normalizeLocation(state *GameStateUpdade, myWidth, myHeight int) {
+
+	peerWidth := state.Width
+	peerHeight := state.Height
+
+	scale_x := float32(myWidth / peerWidth)
+	scale_y := float32(myHeight / peerHeight)
+
+	normalize := func(x int, scale float32) int {
+		normalized := 1.0 * scale * float32(x)
+		return int(normalized)
+	}
+
+	state.FoodPos.X = normalize(state.FoodPos.X, scale_x)
+	state.FoodPos.Y = normalize(state.FoodPos.Y, scale_y)
+
+	if state.OpponenetFoodPos == (Part{}) {
+		state.OpponenetFoodPos.X = normalize(state.OpponenetFoodPos.X, scale_x)
+		state.OpponenetFoodPos.Y = normalize(state.OpponenetFoodPos.Y, scale_y)
+	}
+
+	for _, part := range state.Parts {
+		part.X = normalize(part.X, scale_x)
+		part.Y = normalize(part.Y, scale_x)
+	}
 }

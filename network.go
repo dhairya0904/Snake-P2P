@@ -26,11 +26,13 @@ type Node struct {
 
 	writeChannel chan interface{}
 	readChannel  chan interface{}
+	isConnection chan bool
 }
 
 func (node *Node) InitializeNode() {
 	node.readChannel = make(chan interface{})
 	node.writeChannel = make(chan interface{})
+	node.isConnection = make(chan bool)
 }
 
 func (node *Node) GetNodeChannels() (chan interface{}, chan interface{}) {
@@ -123,6 +125,7 @@ func (node *Node) handleStream(stream network.Stream) {
 
 	go readData(rw, node.readChannel)
 	go writeData(rw, node.writeChannel)
+	node.isConnection <- true
 
 	// 'stream' will stay open until you close it (or the other side closes it).
 }

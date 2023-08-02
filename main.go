@@ -1,8 +1,11 @@
 package main
 
 import (
-	"time"
+	"fmt"
+	"log"
+	"os"
 
+	"github.com/gdamore/tcell"
 	"github.com/rs/zerolog"
 )
 
@@ -27,53 +30,53 @@ func main() {
 
 	if len(cfg.peerAddress) == 0 {
 		node.startMaster(host)
-		time.Sleep(5 * time.Second)
+		if <-node.isConnection {
+			fmt.Println("Connection established")
+		}
 	} else {
 		node.connectWithPeer(host, cfg.peerAddress)
 	}
-	for {
 
+	screen, err := tcell.NewScreen()
+
+	if err != nil {
+		log.Fatalf("%+v", err)
 	}
-	// screen, err := tcell.NewScreen()
+	if err := screen.Init(); err != nil {
+		log.Fatalf("%+v", err)
+	}
 
-	// if err != nil {
-	// 	log.Fatalf("%+v", err)
-	// }
-	// if err := screen.Init(); err != nil {
-	// 	log.Fatalf("%+v", err)
-	// }
+	defStyle := tcell.StyleDefault.Background(tcell.ColorBlack).Foreground(tcell.ColorWhite)
+	screen.SetStyle(defStyle)
 
-	// defStyle := tcell.StyleDefault.Background(tcell.ColorBlack).Foreground(tcell.ColorWhite)
-	// screen.SetStyle(defStyle)
+	game := Game{
+		Screen: screen,
+		Node:   &node,
+	}
 
-	// game := Game{
-	// 	Screen: screen,
-	// 	Node:   &node,
-	// }
-
-	// go game.Run()
-	// for {
-	// 	switch event := game.Screen.PollEvent().(type) {
-	// 	case *tcell.EventResize:
-	// 		game.Screen.Sync()
-	// 	case *tcell.EventKey:
-	// 		if event.Key() == tcell.KeyEscape || event.Key() == tcell.KeyCtrlC {
-	// 			game.Screen.Fini()
-	// 			os.Exit(0)
-	// 		} else if event.Key() == tcell.KeyUp && game.snakeBody.Yspeed == 0 {
-	// 			game.snakeBody.ChangeDir(-1, 0)
-	// 		} else if event.Key() == tcell.KeyDown && game.snakeBody.Yspeed == 0 {
-	// 			game.snakeBody.ChangeDir(1, 0)
-	// 		} else if event.Key() == tcell.KeyLeft && game.snakeBody.Xspeed == 0 {
-	// 			game.snakeBody.ChangeDir(0, -1)
-	// 		} else if event.Key() == tcell.KeyRight && game.snakeBody.Xspeed == 0 {
-	// 			game.snakeBody.ChangeDir(0, 1)
-	// 		} else if event.Rune() == 'y' && game.GameOver {
-	// 			go game.Run()
-	// 		} else if event.Rune() == 'n' && game.GameOver {
-	// 			game.Screen.Fini()
-	// 			os.Exit(0)
-	// 		}
-	// 	}
-	// }
+	go game.Run()
+	for {
+		switch event := game.Screen.PollEvent().(type) {
+		case *tcell.EventResize:
+			game.Screen.Sync()
+		case *tcell.EventKey:
+			if event.Key() == tcell.KeyEscape || event.Key() == tcell.KeyCtrlC {
+				game.Screen.Fini()
+				os.Exit(0)
+			} else if event.Key() == tcell.KeyUp && game.snakeBody.Yspeed == 0 {
+				game.snakeBody.ChangeDir(-1, 0)
+			} else if event.Key() == tcell.KeyDown && game.snakeBody.Yspeed == 0 {
+				game.snakeBody.ChangeDir(1, 0)
+			} else if event.Key() == tcell.KeyLeft && game.snakeBody.Xspeed == 0 {
+				game.snakeBody.ChangeDir(0, -1)
+			} else if event.Key() == tcell.KeyRight && game.snakeBody.Xspeed == 0 {
+				game.snakeBody.ChangeDir(0, 1)
+			} else if event.Rune() == 'y' && game.GameOver {
+				go game.Run()
+			} else if event.Rune() == 'n' && game.GameOver {
+				game.Screen.Fini()
+				os.Exit(0)
+			}
+		}
+	}
 }

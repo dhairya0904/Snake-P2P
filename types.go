@@ -16,8 +16,11 @@ type Part struct {
 }
 
 type GameStateUpdade struct {
-	FoodPos Part   `json:"foodPos"`
-	Parts   []Part `json:"parts"`
-	Xspeed  int    `json:"xSpeed"`
-	Yspeed  int    `json:"ySpeed"`
+	FoodPos          Part   `json:"foodPos"`
+	Parts            []Part `json:"parts"`
+	Xspeed           int    `json:"xSpeed"`
+	Yspeed           int    `json:"ySpeed"`
+	Width            int    `json:"width"`
+	Height           int    `json:"height"`
+	OpponenetFoodPos Part   `json:"opponentFoodPos"`
 }
